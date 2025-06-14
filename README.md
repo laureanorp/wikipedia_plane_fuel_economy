@@ -11,3 +11,5 @@ Instructions to run:
 - Run `streamlit run main.py` on your terminal
 
 A browser tab should have opened, that's it
+
+<img width="761" alt="image" src="https://github.com/user-attachments/assets/5b879588-6470-4871-9a45-e9f674ca5689" />
