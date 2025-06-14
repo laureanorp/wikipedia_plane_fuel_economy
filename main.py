@@ -1,15 +1,42 @@
 import pandas as pd
 import streamlit as st
 import altair as alt
+import requests
+from bs4 import BeautifulSoup
 
 
 source_url = 'https://en.wikipedia.org/wiki/Fuel_economy_in_aircraft#Example_values'
 dfs = pd.read_html(source_url)
 
-# Remove irrelevant tables (could be improved)
-dfs = [table for table in dfs if any(str(col).startswith("Fuel") for col in table.columns)]
+# BS magic to match titles with tables
+response = requests.get(source_url)
+soup = BeautifulSoup(response.text, 'html.parser')
+
+table_titles = []
+current_title = None
+for tag in soup.select("div.mw-heading, table.wikitable"):
+    if "mw-heading" in tag.get("class", []):
+        h_tag = tag.find(['h2', 'h3', 'h4'])
+        if h_tag:
+            current_title = h_tag.get_text(strip=True)
+    elif tag.name == "table" and "wikitable" in tag.get("class", []):
+        table_titles.append(current_title or "Untitled")
+
+# Filter tables (remove irrelevant ones)
+filtered_dfs = []
+filtered_titles = []
+
+for table, title in zip(dfs, table_titles):
+    if any(str(col).startswith("Fuel") for col in table.columns):
+        filtered_dfs.append(table)
+        filtered_titles.append(title)
+
+dfs = filtered_dfs
+table_titles = filtered_titles
+
+# Data cleaning
 for table in dfs:
-    # Rename "Fuel efficiency per seat" to "Fuel per seat"
+    # Rename "Fuel efficiency per seat" (some tables used this name) to "Fuel per seat"
     if "Fuel efficiency per seat" in table.columns:
         table.rename(columns={"Fuel efficiency per seat": "Fuel per seat"}, inplace=True)
     # Prepare new column for data representation
@@ -26,20 +53,18 @@ for table in dfs:
     table.sort_values(by="First flight", ascending=True, inplace=True)
 
 # Streamlit app header
-st.title('Aircraft Fuel Economy Tables')
+st.title('Plane Fuel Economy ✈️')
 
-# user selection of table
+# User chooses the data to view
 df_index = st.selectbox(
-    "Select a table to view",
+    "Select a category to view",
     options=range(len(dfs)),
-    format_func=lambda x: f"Table {x}"
+    format_func=lambda x: table_titles[x] if x < len(table_titles) else f"Table {x}"
 )
 selected_df = dfs[df_index]
 
-print(selected_df.dtypes)
-
 # PLOT
-st.subheader('Fuel per seat vs First flight date')
+st.subheader(f'Fuel per seat vs First flight date ({table_titles[df_index]})')
 
 # Scatter plot
 chart_df = selected_df.copy()
